@@ -1,0 +1,17 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-gray-900 text-slate-300;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply text-slate-100 font-semibold;
+  }
+
+  p {
+    @apply text-slate-400;
+  }
+}
