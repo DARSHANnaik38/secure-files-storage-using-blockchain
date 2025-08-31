@@ -1,34 +1,30 @@
-// src/App.tsx
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { Routes, Route } from "react-router-dom";
 import Layout from "./components/layout/Layout";
-import Home from "./pages/Home";
-import Files from "./pages/Files";
-import Contact from "./pages/Contact";
-import LoginPage from "./pages/LoginPage";
-import RegisterPage from "./pages/RegisterPage";
-import ProfilePage from "./pages/ProfilePage"; // <-- 1. Import the new page
-import NotFound from "./pages/NotFound";
+import HomePage from "./pages/Home.tsx";
+import FilesPage from "./pages/Files.tsx";
+import ContactPage from "./pages/Contact.tsx";
+import LoginPage from "./pages/LoginPage.tsx";
+import RegisterPage from "./pages/RegisterPage.tsx";
+import ProfilePage from "./pages/ProfilePage.tsx";
+import NotFound from "./pages/NotFound.tsx";
 
 function App() {
+  // The <BrowserRouter> has been removed from this file
   return (
-    <BrowserRouter>
-      <Routes>
-        {/* Routes that use the main Layout */}
-        <Route path="/" element={<Layout />}>
-          <Route index element={<Home />} />
-          <Route path="files" element={<Files />} />
-          <Route path="contact" element={<Contact />} />
-          <Route path="profile" element={<ProfilePage />} />{" "}
-          {/* <-- 2. Add the new route */}
-        </Route>
+    <Routes>
+      {/* Routes that use the main layout */}
+      <Route path="/" element={<Layout />}>
+        <Route index element={<HomePage />} />
+        <Route path="files" element={<FilesPage />} />
+        <Route path="contact" element={<ContactPage />} />
+        <Route path="profile" element={<ProfilePage />} />
+      </Route>
 
-        {/* Standalone routes */}
-        <Route path="login" element={<LoginPage />} />
-        <Route path="register" element={<RegisterPage />} />
-
-        <Route path="*" element={<NotFound />} />
-      </Routes>
-    </BrowserRouter>
+      {/* Standalone routes */}
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/register" element={<RegisterPage />} />
+      <Route path="*" element={<NotFound />} />
+    </Routes>
   );
 }
 
