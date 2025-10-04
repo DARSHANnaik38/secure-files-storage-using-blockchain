@@ -1,6 +1,8 @@
 package com.cfs.backend.model;
 
 import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
@@ -16,13 +18,15 @@ import java.util.List;
 @Table(name = "users")
 @Data
 @NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class User implements UserDetails {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false) // Name is now required for registration
+    @Column(nullable = false)
     private String name;
 
     @Column(nullable = false, unique = true)
@@ -31,11 +35,21 @@ public class User implements UserDetails {
     @Column(nullable = false)
     private String password;
 
-    @Column(nullable = true) // Phone number is optional
+    @Column
     private String phoneNumber;
 
-    @Column(nullable = true) // Profile picture URL is optional
+    @Column
     private String profilePictureUrl;
+
+    // The public address of the user's assigned Ganache account
+    @Column(name = "ethereum_address", nullable = false, unique = true)
+    private String ethereumAddress;
+
+    // The private key for the user's assigned Ganache account
+    // WARNING: Storing raw private keys is a major security risk in production.
+    // This is acceptable only for this local, non-production project.
+    @Column(name = "private_key", nullable = false, unique = true)
+    private String privateKey;
 
     @CreationTimestamp
     @Column(updatable = false)

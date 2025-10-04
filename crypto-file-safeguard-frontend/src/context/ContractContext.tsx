@@ -1,8 +1,15 @@
-import React, { createContext, useContext, useState, useCallback } from "react";
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  ReactNode,
+} from "react";
 import { ethers, Contract, BrowserProvider, Signer } from "ethers";
 
 // --- CONTRACT DETAILS ---
-const contractAddress = "0x5FbDB2315678afecb367f032d93F642f64180aa3"; // Remember to update this!
+// Update this every time you re-deploy the contract on Ganache
+const contractAddress = "0xaE8F94d6Be092ae72fd1B46d61CbE22ef5a04013";
 const contractABI = [
   {
     inputs: [
@@ -38,39 +45,48 @@ const contractABI = [
 ];
 // --- END OF CONTRACT DETAILS ---
 
-// Define the shape of our context
+// Define the structure of a file as returned by the contract
+export interface FileData {
+  fileHash: string;
+  fileSize: bigint;
+  fileName: string;
+  uploadTime: bigint;
+  uploader: string;
+}
+
+// Define the shape of the data our context provides
 interface IContractContext {
   contract: Contract | null;
   signer: Signer | null;
-  connectWallet: () => Promise<void>; // The new function to connect
-  isConnected: boolean; // A flag to check connection status
+  connectWallet: () => Promise<void>;
+  isConnected: boolean;
+  uploadFile: (hash: string, size: number, name: string) => Promise<void>;
+  getMyFiles: () => Promise<FileData[]>;
 }
 
-// Create the context
+// Create the context with a default value
 const ContractContext = createContext<IContractContext>({
   contract: null,
   signer: null,
   connectWallet: async () => {},
   isConnected: false,
+  uploadFile: async () => {},
+  getMyFiles: async () => [],
 });
 
 // Create the Provider component
-export const ContractProvider = ({
-  children,
-}: {
-  children: React.ReactNode;
-}) => {
+export const ContractProvider = ({ children }: { children: ReactNode }) => {
   const [signer, setSigner] = useState<Signer | null>(null);
   const [contract, setContract] = useState<Contract | null>(null);
   const [isConnected, setIsConnected] = useState(false);
 
-  // This function will now be called manually by the user
+  // Connect MetaMask wallet
   const connectWallet = useCallback(async () => {
     if (typeof window.ethereum !== "undefined") {
       try {
         const provider = new ethers.BrowserProvider(window.ethereum);
-        // This line will trigger the MetaMask pop-up
         await provider.send("eth_requestAccounts", []);
+
         const userSigner = await provider.getSigner();
         const contractInstance = new ethers.Contract(
           contractAddress,
@@ -81,25 +97,66 @@ export const ContractProvider = ({
         setSigner(userSigner);
         setContract(contractInstance);
         setIsConnected(true);
-        console.log("Wallet connected successfully!");
+        console.log("✅ Wallet connected successfully!");
       } catch (error) {
-        console.error("Failed to connect wallet:", error);
+        console.error("❌ Failed to connect wallet:", error);
       }
     } else {
-      console.error("MetaMask is not installed.");
+      console.error("❌ MetaMask is not installed.");
     }
   }, []);
 
+  // Upload file to blockchain
+  const uploadFile = useCallback(
+    async (hash: string, size: number, name: string) => {
+      if (!contract) {
+        throw new Error("Contract is not connected.");
+      }
+      try {
+        const tx = await contract.addFile(hash, size, name);
+        console.log("📤 Transaction sent:", tx.hash);
+
+        await tx.wait(); // wait for confirmation
+        console.log("✅ File stored on blockchain!");
+      } catch (error) {
+        console.error("❌ Failed to upload file:", error);
+      }
+    },
+    [contract]
+  );
+
+  // Fetch user’s files
+  const getMyFiles = useCallback(async () => {
+    if (!contract) {
+      throw new Error("Contract is not connected.");
+    }
+    try {
+      const files = await contract.getFiles();
+      console.log("📂 Files fetched:", files);
+      return files;
+    } catch (error) {
+      console.error("❌ Failed to fetch files:", error);
+      return [];
+    }
+  }, [contract]);
+
   return (
     <ContractContext.Provider
-      value={{ contract, signer, connectWallet, isConnected }}
+      value={{
+        contract,
+        signer,
+        connectWallet,
+        isConnected,
+        uploadFile,
+        getMyFiles,
+      }}
     >
       {children}
     </ContractContext.Provider>
   );
 };
 
-// Custom hook for easy access
+// Custom hook to access the context
 export const useContract = () => {
   return useContext(ContractContext);
 };

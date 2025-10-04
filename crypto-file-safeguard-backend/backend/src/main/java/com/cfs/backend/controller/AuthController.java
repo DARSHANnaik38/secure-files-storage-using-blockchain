@@ -19,6 +19,7 @@ public class AuthController {
 
     private final AuthService authService;
 
+    // The GanacheService is no longer needed here.
     @Autowired
     public AuthController(AuthService authService) {
         this.authService = authService;
@@ -26,13 +27,15 @@ public class AuthController {
 
     @PostMapping("/register")
     public ResponseEntity<String> register(@Valid @RequestBody RegisterRequest request) {
+        // The AuthService now handles Ganache account assignment internally.
         authService.registerUser(request);
         return ResponseEntity.status(HttpStatus.CREATED).body("User registered successfully!");
     }
 
-    // --- THIS ENDPOINT WAS MISSING ---
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
+        // The AuthService's login method now returns the complete AuthResponse,
+        // including the token and private key.
         AuthResponse response = authService.loginUser(request);
         return ResponseEntity.ok(response);
     }

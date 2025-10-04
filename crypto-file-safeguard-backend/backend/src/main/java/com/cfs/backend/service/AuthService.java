@@ -11,6 +11,8 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.util.Map; // Import Map
+
 @Service
 public class AuthService {
 
@@ -18,28 +20,37 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
+    private final GanacheService ganacheService; // Inject GanacheService
 
     @Autowired
     public AuthService(UserRepository userRepository,
                        PasswordEncoder passwordEncoder,
                        JwtService jwtService,
-                       AuthenticationManager authenticationManager) {
+                       AuthenticationManager authenticationManager,
+                       GanacheService ganacheService) { // Update constructor
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.authenticationManager = authenticationManager;
+        this.ganacheService = ganacheService; // Add this
     }
 
-    public void registerUser(RegisterRequest request) {
+    public void registerUser(RegisterRequest request) { // Removed blockchainAddress from parameters
         if (userRepository.findByEmail(request.email()).isPresent()) {
             throw new IllegalStateException("Email already in use");
         }
 
-        User user = new User();
-        user.setName(request.name());
-        user.setEmail(request.email());
-        user.setPassword(passwordEncoder.encode(request.password())); // Re-enabled hashing
-        user.setPhoneNumber(request.phoneNumber());
+        // Assign a new Ganache account
+        Map.Entry<String, String> assignedAccount = ganacheService.assignNewAccount();
+
+        User user = User.builder()
+                .name(request.name())
+                .email(request.email())
+                .password(passwordEncoder.encode(request.password()))
+                .phoneNumber(request.phoneNumber())
+                .ethereumAddress(assignedAccount.getKey()) // Save the assigned address
+                .privateKey(assignedAccount.getValue())    // Save the assigned private key
+                .build();
 
         userRepository.save(user);
     }
@@ -57,6 +68,13 @@ public class AuthService {
 
         String jwtToken = jwtService.generateToken(user);
 
-        return new AuthResponse(jwtToken);
+        // Build the full response, including the user's private key for front-end use
+        return AuthResponse.builder()
+                .token(jwtToken)
+                .privateKey(user.getPrivateKey())
+                .ethereumAddress(user.getEthereumAddress())
+                .name(user.getName())
+                .email(user.getEmail())
+                .build();
     }
 }

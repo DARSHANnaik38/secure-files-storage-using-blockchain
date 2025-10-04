@@ -19,27 +19,24 @@ type BlockchainFile = {
 };
 
 const FilesPage = () => {
-  // Use our hook to get the contract and connection status
   const { contract, isConnected, connectWallet } = useContract();
   const [userFiles, setUserFiles] = useState<BlockchainFile[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // This `useEffect` hook will run when the wallet connection status changes
+  // Fetch blockchain files whenever wallet is connected
   useEffect(() => {
     const fetchBlockchainFiles = async () => {
-      // Only fetch if the contract is ready and the wallet is connected
       if (contract && isConnected) {
         setIsLoading(true);
         setError("");
         try {
-          // This is the call to your smart contract's `getFiles` function
           const filesFromChain = await contract.getFiles();
           setUserFiles(filesFromChain);
         } catch (err) {
-          console.error("Failed to fetch files:", err);
+          console.error("❌ Failed to fetch files:", err);
           setError(
-            "Could not retrieve your files. Please try reconnecting your wallet."
+            "Could not retrieve your files. Please reconnect your wallet."
           );
         } finally {
           setIsLoading(false);
@@ -48,7 +45,19 @@ const FilesPage = () => {
     };
 
     fetchBlockchainFiles();
-  }, [contract, isConnected]); // It re-runs when the contract or isConnected state changes
+  }, [contract, isConnected]);
+
+  // Download file from IPFS
+  const handleDownload = (hash: string) => {
+    const url = `https://ipfs.io/ipfs/${hash}`;
+    window.open(url, "_blank");
+  };
+
+  // Delete file placeholder
+  const handleDelete = async (hash: string) => {
+    alert(`Delete functionality not yet implemented for hash: ${hash}`);
+    // TODO: integrate smart contract deleteFile(hash) if supported
+  };
 
   // --- Render Logic ---
 
@@ -71,7 +80,7 @@ const FilesPage = () => {
     <div className="container mx-auto py-10">
       <h1 className="text-3xl font-bold text-white mb-2">My Secure Files</h1>
       <p className="text-muted-foreground mb-8">
-        All your files are encrypted and stored securely on the blockchain.
+        All your files are encrypted and stored securely on IPFS & Ethereum.
       </p>
 
       {isLoading && (
@@ -87,7 +96,7 @@ const FilesPage = () => {
             userFiles.map((file, index) => (
               <Card
                 key={index}
-                className="bg-gray-800 border-gray-700 text-white"
+                className="bg-gray-800 border-gray-700 text-white shadow-lg hover:shadow-xl transition"
               >
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -95,7 +104,6 @@ const FilesPage = () => {
                     <span className="truncate">{file.fileName}</span>
                   </CardTitle>
                   <CardDescription>
-                    IPFS Hash:{" "}
                     <span className="font-mono text-xs truncate">
                       {file.fileHash}
                     </span>
@@ -106,12 +114,21 @@ const FilesPage = () => {
                     File Size:{" "}
                     {(Number(file.fileSize) / (1024 * 1024)).toFixed(2)} MB
                   </p>
+                  <p className="text-sm text-muted-foreground">
+                    Uploaded via blockchain
+                  </p>
                 </CardContent>
                 <CardFooter className="flex justify-between">
-                  <Button variant="outline">
+                  <Button
+                    variant="outline"
+                    onClick={() => handleDownload(file.fileHash)}
+                  >
                     <Download className="mr-2 h-4 w-4" /> Download
                   </Button>
-                  <Button variant="destructive">
+                  <Button
+                    variant="destructive"
+                    onClick={() => handleDelete(file.fileHash)}
+                  >
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </CardFooter>
@@ -119,7 +136,7 @@ const FilesPage = () => {
             ))
           ) : (
             <p className="col-span-full text-center text-muted-foreground">
-              You haven't uploaded any files to the blockchain yet.
+              You haven't uploaded any files yet.
             </p>
           )}
         </div>
