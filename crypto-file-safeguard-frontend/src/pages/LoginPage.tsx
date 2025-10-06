@@ -1,8 +1,8 @@
 import React, { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import api from "../services/api";
+import { Link } from "react-router-dom";
+import { useAuth } from "../context/AuthContext"; // Import the useAuth hook
+import { AxiosError } from "axios";
 import { Eye, EyeOff } from "lucide-react";
-
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -14,38 +14,38 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useAuth } from "@/context/AuthContext";
 
 const LoginPage = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
-  const navigate = useNavigate();
-  const { setUser } = useAuth();
+  const { login } = useAuth(); // Get the central login function from the context
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     setError("");
 
     try {
-      const response = await api.post("/auth/login", { email, password });
-      const { token } = response.data;
-      localStorage.setItem("jwtToken", token);
-
-      // Fetch user data after login to populate the context
-      const userResponse = await api.get("/users/me");
-      setUser(userResponse.data);
-
-      navigate("/"); // Redirect to home page
+      // Call the login function from our AuthContext.
+      // The context will handle the API call, token storage, and navigation.
+      await login({ email, password });
     } catch (err) {
-      setError("Login failed. Please check your credentials.");
-      console.error(err);
+      // If the login function throws an error, we display a message to the user.
+      if (
+        err instanceof AxiosError &&
+        (err.response?.status === 403 || err.response?.status === 401)
+      ) {
+        setError("Login failed. Please check your credentials.");
+      } else {
+        setError("An unexpected error occurred. Please try again later.");
+      }
+      console.error("Login Error:", err);
     }
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen">
+    <div className="flex items-center justify-center min-h-screen bg-gray-900 text-white">
       <Card className="w-full max-w-sm bg-gray-800 border-gray-700">
         <form onSubmit={handleSubmit}>
           <CardHeader>
@@ -63,7 +63,7 @@ const LoginPage = () => {
                 placeholder="m@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                autoComplete="off" // <-- Disables autofill
+                autoComplete="off"
                 required
               />
             </div>
@@ -74,7 +74,7 @@ const LoginPage = () => {
                 type={showPassword ? "text" : "password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                autoComplete="new-password" // <-- Disables autofill
+                autoComplete="new-password"
                 required
               />
               <button

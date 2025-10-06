@@ -1,20 +1,17 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { BrowserRouter } from "react-router-dom"; // 1. Import BrowserRouter
+import { BrowserRouter } from "react-router-dom";
 import App from "./App.tsx";
 import "./index.css";
-import { AuthProvider } from "./context/AuthContext";
-import { ContractProvider } from "./context/ContractContext.tsx";
+import { AuthProvider } from "./context/AuthContext.tsx";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    {/* 2. Wrap everything with BrowserRouter */}
+    {/* BrowserRouter must wrap AuthProvider so navigation hooks can be used inside the context */}
     <BrowserRouter>
-      <ContractProvider>
-        <AuthProvider>
-          <App />
-        </AuthProvider>
-      </ContractProvider>
+      <AuthProvider>
+        <App />
+      </AuthProvider>
     </BrowserRouter>
   </React.StrictMode>
 );

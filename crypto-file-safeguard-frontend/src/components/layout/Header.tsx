@@ -1,10 +1,9 @@
+// This file is already correct and requires no changes.
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { User as UserIcon } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-
-// --- THIS IMPORT WAS MISSING ---
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,7 +23,6 @@ const Header = () => {
         <Link to="/" className="text-xl font-bold">
           SecureVault
         </Link>
-
         {isLoggedIn && (
           <div className="hidden md:flex gap-8">
             <Link
@@ -47,7 +45,6 @@ const Header = () => {
             </Link>
           </div>
         )}
-
         <div className="flex items-center justify-end w-24">
           {isLoggedIn && user ? (
             <DropdownMenu>
@@ -111,5 +108,4 @@ const Header = () => {
     </header>
   );
 };
-
 export default Header;

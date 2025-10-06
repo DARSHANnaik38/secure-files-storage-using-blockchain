@@ -1,10 +1,9 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import api from "../services/api";
+import { useAuth } from "../context/AuthContext"; // Import the useAuth hook
 import { AxiosError } from "axios";
 import { Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -17,6 +16,14 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
+// Example type for register function
+type RegisterParams = {
+  name: string;
+  email: string;
+  password?: string;
+  phoneNumber?: string;
+};
+
 const RegisterPage = () => {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -27,6 +34,7 @@ const RegisterPage = () => {
   const [error, setError] = useState("");
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { register } = useAuth(); // Get the central register function from the context
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -38,31 +46,36 @@ const RegisterPage = () => {
     }
 
     try {
-      await api.post("/auth/register", {
-        name,
-        email,
-        password,
-        phoneNumber,
-      });
+      // Call the register function from our AuthContext
+      await register({ name, email, password, phoneNumber });
 
       toast({
         title: "Account Created!",
-        description: "You have been successfully registered.",
+        description: "You have been successfully registered. Please log in.",
       });
 
-      navigate("/login");
+      navigate("/login"); // Redirect to login page on success
     } catch (err) {
       if (err instanceof AxiosError && err.response) {
-        setError(err.response.data || "Registration failed. Please try again.");
+        if (
+          err.response.status === 409 ||
+          err.response.data?.includes("already in use")
+        ) {
+          setError("This email address is already registered.");
+        } else {
+          setError(
+            err.response.data || "Registration failed. Please try again."
+          );
+        }
       } else {
-        setError("An unexpected error occurred.");
+        setError("An unexpected error occurred. Please check your connection.");
       }
-      console.error(err);
+      console.error("Registration Error:", err);
     }
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen">
+    <div className="flex items-center justify-center min-h-screen bg-gray-900 text-white">
       <Card className="w-full max-w-sm bg-gray-800 border-gray-700">
         <form onSubmit={handleSubmit}>
           <CardHeader>
@@ -80,7 +93,7 @@ const RegisterPage = () => {
                 placeholder="John Doe"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                autoComplete="off" // <-- Disables autofill
+                autoComplete="off"
                 required
               />
             </div>
@@ -92,7 +105,7 @@ const RegisterPage = () => {
                 placeholder="m@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                autoComplete="off" // <-- Disables autofill
+                autoComplete="off"
                 required
               />
             </div>
@@ -113,16 +126,9 @@ const RegisterPage = () => {
                 type={showPasswords ? "text" : "password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                autoComplete="new-password" // A hint for browsers not to autofill
+                autoComplete="new-password"
                 required
               />
-              <button
-                type="button"
-                onClick={() => setShowPasswords(!showPasswords)}
-                className="absolute right-2 top-1/2 -translate-y-[-10%] text-gray-400"
-              >
-                {showPasswords ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
             </div>
             <div className="grid gap-2 relative">
               <Label htmlFor="confirm-password">Confirm Password</Label>
@@ -134,13 +140,6 @@ const RegisterPage = () => {
                 autoComplete="new-password"
                 required
               />
-              <button
-                type="button"
-                onClick={() => setShowPasswords(!showPasswords)}
-                className="absolute right-2 top-1/2 -translate-y-[-10%] text-gray-400"
-              >
-                {showPasswords ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
             </div>
             {error && <p className="text-sm text-red-500">{error}</p>}
           </CardContent>

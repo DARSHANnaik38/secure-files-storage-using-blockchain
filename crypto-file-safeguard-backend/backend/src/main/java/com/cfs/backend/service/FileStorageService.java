@@ -4,6 +4,7 @@ import com.cfs.backend.blockchain.contract.FileContract;
 import com.cfs.backend.dto.FileDto;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
+import org.springframework.core.io.Resource; // <-- ADD THIS IMPORT
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
@@ -26,7 +27,6 @@ import java.util.stream.Collectors;
 @Service
 public class FileStorageService {
 
-    // This is the full, long-lived JWT used for authenticating uploads.
     @Value("${pinata.jwt}")
     private String pinataJwt;
 
@@ -36,21 +36,17 @@ public class FileStorageService {
     @Value("${blockchain.contract.address}")
     private String contractAddress;
 
-    // Inject the service responsible for generating temporary download tokens.
     private final PinataJwtService pinataJwtService;
 
     public FileStorageService(PinataJwtService pinataJwtService) {
         this.pinataJwtService = pinataJwtService;
     }
 
-    /**
-     * Uploads a file to Pinata using the master JWT.
-     */
+    // This method remains unchanged
     public Map<String, Object> uploadFileToPinata(MultipartFile file) throws IOException {
         String url = "https://api.pinata.cloud/pinning/pinFileToIPFS";
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.MULTIPART_FORM_DATA);
-        // For uploads, the full JWT must be used as the Bearer token.
         headers.setBearerAuth(this.pinataJwt);
 
         MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
@@ -70,9 +66,7 @@ public class FileStorageService {
         return Map.of("ipfsHash", ipfsHash, "fileName", file.getOriginalFilename(), "fileSize", file.getSize());
     }
 
-    /**
-     * Saves the file metadata to the smart contract on the blockchain.
-     */
+    // This method remains unchanged
     public TransactionReceipt saveHashOnBlockchain(String ipfsHash, String privateKey, String fileName, long fileSize) throws Exception {
         Web3j web3j = Web3j.build(new HttpService(ganacheUrl));
         Credentials credentials = Credentials.create(privateKey);
@@ -80,9 +74,7 @@ public class FileStorageService {
         return contract.addFile(ipfsHash, BigInteger.valueOf(fileSize), fileName).send();
     }
 
-    /**
-     * Retrieves all file records for a given user from the blockchain.
-     */
+    // This method remains unchanged
     public List<FileDto> getFilesForUser(String privateKey) throws Exception {
         Web3j web3j = Web3j.build(new HttpService(ganacheUrl));
         Credentials credentials = Credentials.create(privateKey);
@@ -99,11 +91,8 @@ public class FileStorageService {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Generates a secure, temporary (60-second) download link after verifying ownership.
-     */
+    // This method remains unchanged
     public String generateSecureDownloadLink(String privateKey, String ipfsHash) throws Exception {
-        // Step 1: Verify ownership on the blockchain.
         List<FileDto> userFiles = getFilesForUser(privateKey);
         boolean isOwner = userFiles.stream().anyMatch(file -> file.ipfsHash().equals(ipfsHash));
 
@@ -111,12 +100,28 @@ public class FileStorageService {
             throw new SecurityException("User is not authorized to access this file.");
         }
 
-        // Step 2: Generate a NEW, short-lived, single-file token.
         String scopedToken = pinataJwtService.generateScopedToken(ipfsHash);
-
-        // Step 3: Create the temporary download URL with the new ephemeral token.
         String gatewayUrl = "https://gateway.pinata.cloud/ipfs/";
         return gatewayUrl + ipfsHash + "?pinataGatewayToken=" + scopedToken;
     }
-}
 
+    // --- ADD THIS NEW METHOD ---
+    /**
+     * Acts as a proxy to download the file from Pinata.
+     * This method verifies ownership and then fetches the file content server-side.
+     */
+    public Resource downloadFileAsResource(String privateKey, String ipfsHash) throws Exception {
+        // Step 1: This existing method verifies ownership and gets a temporary token
+        String secureUrl = generateSecureDownloadLink(privateKey, ipfsHash);
+
+        // Step 2: The backend uses RestTemplate to fetch the file from Pinata
+        RestTemplate restTemplate = new RestTemplate();
+        ResponseEntity<ByteArrayResource> response = restTemplate.getForEntity(secureUrl, ByteArrayResource.class);
+
+        if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
+            return response.getBody();
+        } else {
+            throw new RuntimeException("Failed to download file from Pinata. Status: " + response.getStatusCode());
+        }
+    }
+}

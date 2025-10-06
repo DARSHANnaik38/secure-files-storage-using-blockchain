@@ -1,10 +1,12 @@
 package com.cfs.backend.controller;
 
-import com.cfs.backend.dto.DownloadLinkDto;
 import com.cfs.backend.dto.FileDto;
 import com.cfs.backend.model.User;
 import com.cfs.backend.service.FileStorageService;
+import org.springframework.core.io.Resource; // <-- ADD THIS IMPORT
+import org.springframework.http.HttpHeaders;   // <-- ADD THIS IMPORT
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;    // <-- ADD THIS IMPORT
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -24,10 +26,10 @@ public class FileController {
         this.fileStorageService = fileStorageService;
     }
 
+    // This endpoint remains unchanged
     @PostMapping("/upload")
     public ResponseEntity<?> uploadFile(@RequestParam("file") MultipartFile file) {
         try {
-            // The service now returns a map with ipfsHash, fileName, and fileSize
             Map<String, Object> uploadResult = fileStorageService.uploadFileToPinata(file);
             return ResponseEntity.ok(uploadResult);
         } catch (IOException e) {
@@ -36,21 +38,20 @@ public class FileController {
         }
     }
 
+    // This endpoint remains unchanged
     @PostMapping("/save-hash")
     public ResponseEntity<String> saveHash(
-            @RequestBody Map<String, Object> requestBody, // Accept a Map of generic objects
+            @RequestBody Map<String, Object> requestBody,
             Authentication authentication
     ) {
         try {
             String ipfsHash = (String) requestBody.get("ipfsHash");
             String fileName = (String) requestBody.get("fileName");
-            // Correctly extract and convert the fileSize from the request
             long fileSize = ((Number) requestBody.get("fileSize")).longValue();
 
             User user = (User) authentication.getPrincipal();
             String privateKey = user.getPrivateKey();
 
-            // Pass all required parameters to the service layer
             fileStorageService.saveHashOnBlockchain(ipfsHash, privateKey, fileName, fileSize);
 
             return ResponseEntity.ok("Hash saved to blockchain successfully!");
@@ -60,6 +61,7 @@ public class FileController {
         }
     }
 
+    // This endpoint remains unchanged
     @GetMapping("/my-files")
     public ResponseEntity<List<FileDto>> getMyFiles(Authentication authentication) {
         try {
@@ -73,22 +75,37 @@ public class FileController {
         }
     }
 
+    // --- REPLACE THE ENTIRE DOWNLOAD ENDPOINT WITH THIS ---
     @GetMapping("/download/{ipfsHash}")
-    public ResponseEntity<?> getDownloadLink(
+    public ResponseEntity<Resource> downloadFile(
             @PathVariable String ipfsHash,
             Authentication authentication
     ) {
         try {
             User user = (User) authentication.getPrincipal();
             String privateKey = user.getPrivateKey();
-            String secureUrl = fileStorageService.generateSecureDownloadLink(privateKey, ipfsHash);
-            return ResponseEntity.ok(new DownloadLinkDto(secureUrl));
+
+            // 1. Get the file content as a Resource from the service
+            Resource resource = fileStorageService.downloadFileAsResource(privateKey, ipfsHash);
+
+            // 2. Find the original filename to tell the browser what to name the file
+            String filename = fileStorageService.getFilesForUser(privateKey).stream()
+                    .filter(f -> f.ipfsHash().equals(ipfsHash))
+                    .findFirst()
+                    .map(FileDto::fileName)
+                    .orElse("downloaded-file");
+
+            // 3. Return the file data directly to the user for download
+            return ResponseEntity.ok()
+                    .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                    .body(resource);
+
         } catch (SecurityException e) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.internalServerError().build();
         }
     }
 }
-

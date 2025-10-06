@@ -1,6 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import { useAuth } from "@/context/AuthContext"; // Your existing auth context
-import { useContract } from "@/context/ContractContext"; // Our new contract context
+import { useAuth } from "@/context/AuthContext";
 import api from "@/services/api";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -8,47 +7,31 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { User as UserIcon, File as FileIcon } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
-// Define a TypeScript type for the file data we get from the smart contract
-type BlockchainFile = {
-  fileName: string;
-  fileSize: bigint;
-  fileHash: string;
-};
-
 const ProfilePage = () => {
-  // --- EXISTING AUTH LOGIC ---
-  const { user, setUser, isLoading: isAuthLoading } = useAuth();
+  const { user, updateUserData, isLoading: isAuthLoading } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // --- NEW BLOCKCHAIN LOGIC ---
-  const { contract, connectWallet, isConnected } = useContract();
-  const [userFiles, setUserFiles] = useState<BlockchainFile[]>([]);
+  const [fileCount, setFileCount] = useState<number | null>(null);
   const [isFilesLoading, setIsFilesLoading] = useState(false);
-  const [filesError, setFilesError] = useState("");
 
-  // Effect to fetch files from the blockchain when the wallet is connected
   useEffect(() => {
-    const fetchBlockchainFiles = async () => {
-      // Only run if the contract exists and the wallet is connected
-      if (contract && isConnected) {
+    const fetchFileCount = async () => {
+      if (user) {
         setIsFilesLoading(true);
-        setFilesError("");
         try {
-          const filesFromChain = await contract.getFiles();
-          setUserFiles(filesFromChain);
+          const response = await api.get("/files/count");
+          setFileCount(response.data.count);
         } catch (err) {
-          console.error("Failed to fetch blockchain files:", err);
-          setFilesError("Could not retrieve your files. Please try again.");
+          console.error("Failed to fetch file count:", err);
+          setFileCount(0);
         } finally {
           setIsFilesLoading(false);
         }
       }
     };
+    fetchFileCount();
+  }, [user]);
 
-    fetchBlockchainFiles();
-  }, [contract, isConnected]); // This hook depends on `isConnected` now
-
-  // --- EXISTING PROFILE PICTURE LOGIC ---
   const handleButtonClick = () => {
     fileInputRef.current?.click();
   };
@@ -67,9 +50,7 @@ const ProfilePage = () => {
         headers: { "Content-Type": "multipart/form-data" },
       });
       const newImageUrl = response.data.profilePictureUrl;
-      if (user) {
-        setUser({ ...user, profilePictureUrl: newImageUrl });
-      }
+      updateUserData({ profilePictureUrl: newImageUrl });
       toast({ title: "Success", description: "Profile picture updated!" });
     } catch (error) {
       console.error("Failed to upload profile picture:", error);
@@ -81,7 +62,6 @@ const ProfilePage = () => {
     }
   };
 
-  // --- RENDER LOGIC ---
   if (isAuthLoading) {
     return (
       <div className="text-center text-white p-10">Loading profile...</div>
@@ -91,13 +71,14 @@ const ProfilePage = () => {
   if (!user) {
     return (
       <div className="text-center text-red-500 p-10">
-        Failed to load profile.
+        User not found. Please log in.
       </div>
     );
   }
 
   return (
     <div className="container mx-auto py-10 text-white">
+      {/* Hidden file input for profile picture */}
       <input
         type="file"
         ref={fileInputRef}
@@ -107,7 +88,7 @@ const ProfilePage = () => {
       />
 
       <div className="grid md:grid-cols-2 gap-8">
-        {/* Card 1: User Profile */}
+        {/* User Details Card */}
         <Card className="bg-gray-800 border-gray-700">
           <CardHeader className="text-center">
             <CardTitle className="text-2xl">My Account</CardTitle>
@@ -127,12 +108,6 @@ const ProfilePage = () => {
                 <h2 className="text-xl font-semibold">{user.name}</h2>
                 <p className="text-muted-foreground">{user.email}</p>
               </div>
-              <div className="w-full text-sm">
-                <div className="flex justify-between py-2 border-b border-gray-700">
-                  <span className="text-muted-foreground">Phone Number:</span>
-                  <span>{user.phoneNumber || "Not provided"}</span>
-                </div>
-              </div>
               <Button variant="outline" onClick={handleButtonClick}>
                 Change Profile Picture
               </Button>
@@ -140,50 +115,22 @@ const ProfilePage = () => {
           </CardContent>
         </Card>
 
-        {/* Card 2: Blockchain Files */}
+        {/* File Summary Card */}
         <Card className="bg-gray-800 border-gray-700">
           <CardHeader>
             <CardTitle className="text-2xl text-center">
-              My Blockchain Files
+              File Storage Summary
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            {!isConnected ? (
-              <div className="text-center">
-                <p className="mb-4">
-                  Connect your wallet to view your secure files.
-                </p>
-                <Button onClick={connectWallet}>Connect Wallet</Button>
-              </div>
+          <CardContent className="flex flex-col items-center justify-center h-full space-y-4">
+            <FileIcon className="h-16 w-16 text-blue-400" />
+            {isFilesLoading ? (
+              <p>Loading file stats...</p>
             ) : (
-              <>
-                {isFilesLoading && <p>Loading files from blockchain...</p>}
-                {filesError && <p className="text-red-500">{filesError}</p>}
-                {!isFilesLoading && !filesError && (
-                  <ul className="space-y-3">
-                    {userFiles.length > 0 ? (
-                      userFiles.map((file, index) => (
-                        <li
-                          key={index}
-                          className="flex items-center p-2 bg-gray-700 rounded-md"
-                        >
-                          <FileIcon className="h-5 w-5 mr-3 text-blue-400" />
-                          <div className="flex-grow">
-                            <p className="font-semibold">{file.fileName}</p>
-                            <p className="text-xs text-muted-foreground">
-                              Size: {file.fileSize.toString()} bytes
-                            </p>
-                          </div>
-                        </li>
-                      ))
-                    ) : (
-                      <p className="text-center text-muted-foreground">
-                        No files found on the blockchain.
-                      </p>
-                    )}
-                  </ul>
-                )}
-              </>
+              <div className="text-center">
+                <p className="text-4xl font-bold">{fileCount ?? "N/A"}</p>
+                <p className="text-muted-foreground">Secure Files Stored</p>
+              </div>
             )}
           </CardContent>
         </Card>
